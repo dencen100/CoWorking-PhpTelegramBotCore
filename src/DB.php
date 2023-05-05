@@ -74,29 +74,36 @@ class DB
         array $credentials,
         Telegram $telegram,
         $table_prefix = '',
-        $encoding = 'utf8mb4'
+        $encoding = ''
     ): PDO {
         if (empty($credentials)) {
-            throw new TelegramException('MySQL credentials not provided!');
+            throw new TelegramException('DB credentials not provided!');
         }
-        if (isset($credentials['unix_socket'])) {
-            $dsn = 'mysql:unix_socket=' . $credentials['unix_socket'];
-        } else {
-            $dsn = 'mysql:host=' . $credentials['host'];
-        }
-        $dsn .= ';dbname=' . $credentials['database'];
+        if (!empty($credentials['dbtype']) && $credentials['dbtype'] == 'mysql') {
+            if (isset($credentials['unix_socket'])) {
+                $dsn = 'mysql:unix_socket=' . $credentials['unix_socket'];
+            } else {
+                $dsn = 'mysql:host=' . $credentials['host'];
+            }
+            $dsn .= ';dbname=' . $credentials['database'];
 
-        if (!empty($credentials['port'])) {
-            $dsn .= ';port=' . $credentials['port'];
+            if (!empty($credentials['port'])) {
+                $dsn .= ';port=' . $credentials['port'];
+            }
+            if ($encoding == '') $encoding=utf8mb4;
+            $options = [PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES ' . $encoding];
+            try {
+                $pdo = new PDO($dsn, $credentials['user'], $credentials['password'], $options);
+                $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_WARNING);
+            } catch (PDOException $e) {
+                throw new TelegramException($e->getMessage());
+            }
+        }else if(!empty($credentials['dbtype']) && $credentials['dbtype'] == 'sqlite') {
+            // SQLITE version
+        }else{
+            throw new TelegramException('dbtype of DB credentials is not provided');
         }
 
-        $options = [PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES ' . $encoding];
-        try {
-            $pdo = new PDO($dsn, $credentials['user'], $credentials['password'], $options);
-            $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_WARNING);
-        } catch (PDOException $e) {
-            throw new TelegramException($e->getMessage());
-        }
 
         self::$pdo               = $pdo;
         self::$telegram          = $telegram;
@@ -126,7 +133,7 @@ class DB
         string $table_prefix = ''
     ): PDO {
         if ($external_pdo_connection === null) {
-            throw new TelegramException('MySQL external connection not provided!');
+            throw new TelegramException('DB external connection not provided!');
         }
 
         self::$pdo               = $external_pdo_connection;
